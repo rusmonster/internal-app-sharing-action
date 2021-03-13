@@ -4,7 +4,6 @@ import { google } from "googleapis";
 
 const androidpublisher = google.androidpublisher('v3');
 const auth = new google.auth.GoogleAuth({
-    keyFile: '/Users/dkalita/Downloads/pc-api-6854827922025163363-832-fc7e097a49a3.json',
     scopes: ['https://www.googleapis.com/auth/androidpublisher']
 });
 
@@ -13,12 +12,14 @@ const serviceJsonPropertyName = "serviceAccountJsonPlainText";
 const packageNamePropertyName = "packageName";
 const apkPathPropertyName = "apkFilePath";
 const aabPathPropertyName = "aabFilePath";
+const trackPropertyName = "track";
 
 // Input values
 let serviceAccountJsonRaw: string | undefined;
 let packageName: string | undefined;
 let apkPath: string | undefined;
 let aabPath: string | undefined;
+let track: string | undefined;
 
 /**
  * This function is to make sure that the action receives valid inputs. For example it ensures that either apkPath or aabPath is provided.
@@ -26,15 +27,19 @@ let aabPath: string | undefined;
  */
 export function getAndValidateInputs() {
     // Required variables are automatically validated by actions, if missing getInput will throw an error
-    serviceAccountJsonRaw = core.getInput(serviceJsonPropertyName, { required: false });
-
+    serviceAccountJsonRaw = core.getInput(serviceJsonPropertyName, { required: true });
     packageName = "fm.peremen.android"; //core.getInput(packageNamePropertyName, { required: true });
     apkPath = core.getInput(apkPathPropertyName, { required: false });
-    aabPath = "/Users/dkalita/android/PeremenFM/app/release/app-release.aab"; // core.getInput(aabPathPropertyName, { required: false });
+    aabPath = core.getInput(aabPathPropertyName, { required: false });
+    track = core.getInput(trackPropertyName, { required: false });
 
     // Any optional inputs should be validated here
     if (!apkPath && !aabPath) {
         throw new Error(`You must provide either '${apkPathPropertyName}' or '${aabPathPropertyName}' to use this action`)
+    }
+
+    if (!track) {
+        track = "internal"
     }
 }
 
@@ -52,8 +57,6 @@ export function setGoogleCredentials() {
         // Ensure that the api can find our service account credentials
         core.exportVariable("GOOGLE_APPLICATION_CREDENTIALS", serviceAccountFile);
     }
-    // const serviceAccountFile = "/Users/dkalita/Downloads/pc-api-6854827922025163363-832-fc7e097a49a3.json";
-    // core.exportVariable("GOOGLE_APPLICATION_CREDENTIALS", serviceAccountFile);
 }
 
 async function main(): Promise<any> {
@@ -68,8 +71,18 @@ async function main(): Promise<any> {
 
     // TODO: does this block need to be tested?
     let res: any; // TODO: add a type to this
+
+    res = await androidpublisher.edits.insert({
+        packageName: packageName
+    })
+
+    const util = require('util')
+    console.log("insert OK: " + util.inspect(res.data, false, null, true))
+
+    const editId = res.data.id
+
     if(apkPath) {
-        res = await androidpublisher.internalappsharingartifacts.uploadapk({
+        res = await androidpublisher.edits.apks.upload({
             packageName: packageName,
             media: {
                 mimeType: 'application/octet-stream',
@@ -77,15 +90,6 @@ async function main(): Promise<any> {
             }
         })
     } else if (aabPath) {
-        res = await androidpublisher.edits.insert({
-            packageName: packageName
-        })
-
-        const util = require('util')
-        console.log("insert OK: " + util.inspect(res.data, false, null, true))
-
-        const editId = res.data.id
-
         res = await androidpublisher.edits.bundles.upload({
             packageName: packageName,
             editId: editId,
@@ -94,42 +98,44 @@ async function main(): Promise<any> {
                 body: fs.createReadStream(aabPath)
             }
         })
-
-        console.log("upload OK: " + util.inspect(res.data, false, null, true))
-
-        const versionCode = res.data.versionCode
-
-        res = await androidpublisher.edits.tracks.update({
-            packageName: packageName,
-            editId: editId,
-            track: "internal",
-            requestBody: {
-              track: "internal",
-              releases: [
-                {
-                  status: "completed",
-                  versionCodes: [versionCode]
-                }
-              ]
-            }
-        })
-
-        console.log("set track OK: " + util.inspect(res.data, false, null, true))
-
-        res = await androidpublisher.edits.commit({
-            packageName: packageName,
-            editId: editId
-        })
-
-        console.log("commit OK: " + util.inspect(res.data, false, null, true))
     }
-    return res.data;
+
+    console.log("upload OK: " + util.inspect(res.data, false, null, true))
+
+    const data = res.data
+    const versionCode = res.data.versionCode
+
+    res = await androidpublisher.edits.tracks.update({
+        packageName: packageName,
+        editId: editId,
+        track: track,
+        requestBody: {
+          track: track,
+          releases: [
+            {
+              status: "completed",
+              versionCodes: [versionCode]
+            }
+          ]
+        }
+    })
+
+    console.log("set track OK: " + util.inspect(res.data, false, null, true))
+
+    res = await androidpublisher.edits.commit({
+        packageName: packageName,
+        editId: editId
+    })
+
+    console.log("commit OK: " + util.inspect(res.data, false, null, true))
+
+    return data;
 }
 
 main().then((data) => {
-    core.setOutput("downloadUrl", data.downloadUrl)
-    core.setOutput("certificateFingerprint", data.certificateFingerprint)
+    core.setOutput("versionCode", data.versionCode)
+    core.setOutput("sha1", data.sha1)
     core.setOutput("sha256", data.sha256)
 }).catch ((e) => {
-    core.setFailed(e.message + "; status: " + e.status + "; reason: " + e.reason)
+    core.setFailed(e.message)
 })

@@ -12,12 +12,14 @@ const serviceJsonPropertyName = "serviceAccountJsonPlainText";
 const packageNamePropertyName = "packageName";
 const apkPathPropertyName = "apkFilePath";
 const aabPathPropertyName = "aabFilePath";
+const trackPropertyName = "track";
 
 // Input values
 let serviceAccountJsonRaw: string | undefined;
 let packageName: string | undefined;
 let apkPath: string | undefined;
 let aabPath: string | undefined;
+let track: string | undefined;
 
 /**
  * This function is to make sure that the action receives valid inputs. For example it ensures that either apkPath or aabPath is provided.
@@ -26,13 +28,18 @@ let aabPath: string | undefined;
 export function getAndValidateInputs() {
     // Required variables are automatically validated by actions, if missing getInput will throw an error
     serviceAccountJsonRaw = core.getInput(serviceJsonPropertyName, { required: true });
-    packageName = core.getInput(packageNamePropertyName, { required: true });
+    packageName = "fm.peremen.android"; //core.getInput(packageNamePropertyName, { required: true });
     apkPath = core.getInput(apkPathPropertyName, { required: false });
     aabPath = core.getInput(aabPathPropertyName, { required: false });
+    track = core.getInput(trackPropertyName, { required: false });
 
     // Any optional inputs should be validated here
     if (!apkPath && !aabPath) {
         throw new Error(`You must provide either '${apkPathPropertyName}' or '${aabPathPropertyName}' to use this action`)
+    }
+
+    if (!track) {
+        track = "internal"
     }
 }
 
@@ -64,8 +71,18 @@ async function main(): Promise<any> {
 
     // TODO: does this block need to be tested?
     let res: any; // TODO: add a type to this
+
+    res = await androidpublisher.edits.insert({
+        packageName: packageName
+    })
+
+    const util = require('util')
+    console.log("insert OK: " + util.inspect(res.data, false, null, true))
+
+    const editId = res.data.id
+
     if(apkPath) {
-        res = await androidpublisher.internalappsharingartifacts.uploadapk({
+        res = await androidpublisher.edits.apks.upload({
             packageName: packageName,
             media: {
                 mimeType: 'application/octet-stream',
@@ -73,20 +90,51 @@ async function main(): Promise<any> {
             }
         })
     } else if (aabPath) {
-        res = await androidpublisher.internalappsharingartifacts.uploadbundle({
+        res = await androidpublisher.edits.bundles.upload({
             packageName: packageName,
+            editId: editId,
             media: {
                 mimeType: 'application/octet-stream',
                 body: fs.createReadStream(aabPath)
             }
         })
     }
-    return res.data;
+
+    console.log("upload OK: " + util.inspect(res.data, false, null, true))
+
+    const data = res.data
+    const versionCode = res.data.versionCode
+
+    res = await androidpublisher.edits.tracks.update({
+        packageName: packageName,
+        editId: editId,
+        track: track,
+        requestBody: {
+          track: track,
+          releases: [
+            {
+              status: "completed",
+              versionCodes: [versionCode]
+            }
+          ]
+        }
+    })
+
+    console.log("set track OK: " + util.inspect(res.data, false, null, true))
+
+    res = await androidpublisher.edits.commit({
+        packageName: packageName,
+        editId: editId
+    })
+
+    console.log("commit OK: " + util.inspect(res.data, false, null, true))
+
+    return data;
 }
 
 main().then((data) => {
-    core.setOutput("downloadUrl", data.downloadUrl)
-    core.setOutput("certificateFingerprint", data.certificateFingerprint)
+    core.setOutput("versionCode", data.versionCode)
+    core.setOutput("sha1", data.sha1)
     core.setOutput("sha256", data.sha256)
 }).catch ((e) => {
     core.setFailed(e.message)

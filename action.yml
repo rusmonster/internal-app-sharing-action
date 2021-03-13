@@ -13,13 +13,16 @@ inputs:
   aabFilePath:
     description: '.aab file path'
     required: false
+  track:
+    description: 'Testing track name: internal, alpha etc'
+    required: false
 outputs:
-  downloadUrl:
-    description: 'The download URL generated for the uploaded artifact.'
-  certificateFingerprint:
-    description: 'The SHA256 fingerprint of the certificate used to signed the generated artifact.'
+  versionCode:
+    description: 'Version code of the uploaded artifact'
+  sha1:
+    description: 'A sha1 hash of the artifact, encoded as a hex string and matching the output of the sha1sum command.'
   sha256:
-    description: 'The SHA-256 hash of the artifact represented as a lowercase hexadecimal number, matching the output of the sha256sum command.'       
+    description: 'A sha256 hash of the artifact, encoded as a hex string and matching the output of the sha256sum command.'
 runs:
   using: 'node12'
   main: 'dist/index/index.js'

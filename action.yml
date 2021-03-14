@@ -1,5 +1,5 @@
-name: 'Internal App Sharing'
-description: 'Upload aab/apk to Internal App Sharing on Play Console'
+name: 'Internal Testing Uploader'
+description: 'Upload aab/apk to Internal Testing Track (initernal, alpha, beta etc) on Play Console'
 inputs:
   serviceAccountJsonPlainText:
     description: 'The service account json plain text private key file to authorize the upload request'

@@ -1,5 +1,5 @@
-# Internal App Sharing
-GitHub Action to upload aab/apk to Internal App Sharing on Play console.
+# Internal Testing Uploader
+GitHub Action to upload aab/apk to Internal Test Track (internal, alphha, beta etc) on Play console.
 
 ## Inputs
 
@@ -15,33 +15,38 @@ Path to your application's apk file.
 ### `aabFilePath`
 Path to your application's aab file.
 
+### `track`
+Testing track name: internal, alpha, beta etc
+
 ## Outputs
 
-### `downloadUrl`
-The download URL generated for the uploaded artifact.
+### `versionCode`
+Version code of the uploaded artifact.
 
-### `certificateFingerprint`
-The SHA256 fingerprint of the certificate used to sign the generated artifact.
+### `sha1`
+A sha1 hash of the artifact, encoded as a hex string and matching the output of the sha1sum command.
 
 ### `sha256`
-The SHA-256 hash of the artifact.
+A sha256 hash of the artifact, encoded as a hex string and matching the output of the sha256sum command.
 
 ## Sample for uploading aab
 ```yml
-uses: sagar-viradiya/internal-app-sharing-action@{latest_version}
+uses: rusmonster/internal-app-sharing-action@1.2.0
 with:
   serviceAccountJsonPlainText: ${{ secrets.<your-github-service-acc-json-secret> }}
   packageName: <your-package-name>
   aabFilePath: <path-to-aab>
+  track: <track>
 ```
 
 ## Sample for uploading apk
 ```yml
-uses: sagar-viradiya/internal-app-sharing-action@{latest_version}
+uses: rusmonster/internal-app-sharing-action@1.2.0
 with:
   serviceAccountJsonPlainText: ${{ secrets.<your-github-service-acc-json-secret> }}
   packageName: <your-package-name>
   apkFilePath: <path-to-apk>
+  track: <track>
 ```
 
 > Action is taking care of deleting the Service Account JSON file it creates internally so that it won't get compromised for any reason :slightly_smiling_face:.
